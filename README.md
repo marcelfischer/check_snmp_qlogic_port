@@ -5,12 +5,12 @@ Nagios Plugin to check some statistics from a switchport of your choice.
 Tested on Qlogic Sanbox 5802
 
 Usage: <br>
--H = Hostname or IP
--C = SNMP Community
--p = Switch Port
--t = Mode (errors,status,speed,statistics)
-        errors include status
-        speed include status
-        statistics include all other modes
--w = Warning
+-H = Hostname or IP <br>
+-C = SNMP Community <br>
+-p = Switch Port <br>
+-t = Mode (errors,status,speed,statistics) <br>
+        errors include status <br>
+        speed include status <br>
+        statistics include all other modes <br>
+-w = Warning <br>
 -c = Critical
