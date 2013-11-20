@@ -2,7 +2,7 @@ check_snmp_qlogic_port
 
 Nagios Plugin to check some statistics from a switchport of your choice.
 
-Tested on Qlogic Sanbox 5802
+Tested on Qlogic Sanbox 5802 and 5600
 
 Usage: <br>
 -H = Hostname or IP <br>
