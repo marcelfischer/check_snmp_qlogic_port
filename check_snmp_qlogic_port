@@ -1,0 +1,174 @@
+#!/bin/bash
+# Autor: Marcel Fischer
+#
+# Changelog:
+# - 16.11.2013 Version 1
+#	- First Release
+#
+# - 18.11.2013 Version 1.1
+#	- Port status check bugfix
+#
+# Todo:
+# - get sysdesc from port
+# - option for extended errors output
+
+while getopts ":H:C:p:t:w:c:" opt; do
+case $opt in
+H)
+export HOST=$OPTARG >&2
+;;
+C)
+export COMMUNITY=$OPTARG >&2
+;;
+p)
+export PORT=$OPTARG >&2
+;;
+t)
+export TYP=$OPTARG >&2
+;;
+w)
+export WARN=$OPTARG >&2
+;;
+c)
+export CRIT=$OPTARG >&2
+;;
+\?)
+echo "Invalid option: -$OPTARG" >&2
+echo "Usage:"
+echo "-H = Hostname or IP"
+echo "-C = SNMP Community"
+echo "-p = Switch Port"
+echo "-t = Mode (errors,status,speed,statistics)"
+echo "	errors include status"
+echo "	speed include status"
+echo "	statistics include all other modes"
+echo "-w = Warning"
+echo "-c = Critical"
+exit 3
+;;
+:)
+echo "Option -$OPTARG requires an argument." >&2
+echo "Usage:"
+echo "-H = Hostname or IP"
+echo "-C = SNMP Community"
+echo "-p = Switch Port"
+echo "-t = Mode (errors,status,speed,statistics)"
+echo "	errors include status"
+echo "	speed include status"
+echo "	statistics include all other modes"
+echo "-w = Warning"
+echo "-c = Critical"
+exit 3
+;;
+esac
+done
+
+#Set Warning and Critical
+if [ "$WARN" = '' ]
+then
+	WARN=10000
+fi
+
+if [ "$CRIT" = '' ]
+then
+	CRIT=100000
+fi
+
+PORT_STATUS_OID=1.3.6.1.2.1.75.1.2.2.1.2.1
+PORT_ADMIN_STATUS_OID=1.3.6.1.2.1.75.1.2.2.1.1.1
+PORT_PARTNER_WWPN_OID=1.3.6.1.2.1.75.1.2.3.1.10.1
+
+PORT_TX_SPEED_OID=1.3.6.1.3.94.4.5.1.6.16.0.0.192.221
+PORT_RX_SPEED_OID=1.3.6.1.3.94.4.5.1.7.16.0.0.192.221
+PORT_REAL=$(($PORT+1))
+
+PORT_STATUS=`snmpwalk -v2c -c $COMMUNITY $HOST $PORT_STATUS_OID.$PORT_REAL  | sed -e 's,^.*: ,,' | tr -d ' ' | bc`
+PORT_ADMIN_STATUS=`snmpwalk -v2c -c $COMMUNITY $HOST $PORT_ADMIN_STATUS_OID.$PORT_REAL  | sed -e 's,^.*: ,,' | tr -d ' ' | bc`
+
+OUTPUT=""
+EXIT_CODE=3
+
+#Status check
+if [ "$TYP" = 'status' ] || [ "$TYP" = 'errors' ] || [ "$TYP" = 'speed' ] || [ "$TYP" = 'statistics' ]
+then
+	if [ $PORT_STATUS -gt 1 ] && [ $PORT_ADMIN_STATUS = 1 ]
+	then
+		OUTPUT="CRITICAL - Port $PORT is down"
+		EXIT_CODE=2
+	fi
+
+	if [ $PORT_ADMIN_STATUS -ge 2 ]
+	then
+		OUTPUT="OK - Port $PORT is admin disabled"
+		EXIT_CODE=0
+	fi
+
+	if [ $PORT_STATUS = 1 ]
+	then
+		PORT_PARTNER_WWPN=`snmpwalk -v2c -c $COMMUNITY $HOST $PORT_PARTNER_WWPN_OID.$PORT_REAL.1  | sed -e 's,^.*: ,,' | tr -d ' '`
+		if [[ $PORT_PARTNER_WWPN =~ .*SNMP.* ]]
+		then
+			PORT_PARTNER_WWPN_REAL="0"
+		else
+			PORT_PARTNER_WWPN_REAL=`echo $PORT_PARTNER_WWPN | bc`
+		fi
+	fi
+
+	if [ "$TYP" = 'status' ] && [ $PORT_STATUS = 1 ]
+	then
+		OUTPUT="OK - Port $PORT is up, Partner WWPN is $PORT_PARTNER_WWPN_REAL"
+		EXIT_CODE=0
+	fi
+fi
+
+#Error check
+if [ "$TYP" = 'errors' ] || [ "$TYP" = 'statistics' ] && [ $PORT_STATUS = 1 ]
+then
+	PORT_ERROR_OID=.1.3.6.1.3.94.4.5.1.3.16.0.0
+	PORT_ERROR=`snmpwalk -v2c -c $COMMUNITY $HOST $PORT_ERROR_OID | grep ".0.0.$PORT_REAL ="  | sed -e 's,^.*: ,,' | tr -d ' ' | bc`
+	PERFDATA="errors=$PORT_ERROR;$WARN;$CRIT;;"
+fi
+
+if [ "$TYP" = 'speed' ] && [ $PORT_STATUS = 1 ]
+then
+	PORT_TX_SPEED=`snmpwalk -v2c -c $COMMUNITY $HOST $PORT_TX_SPEED_OID | grep ".0.0.$PORT_REAL ="  | sed -e 's,^.*: ,,' | tr -d ' ' | bc`
+	PORT_RX_SPEED=`snmpwalk -v2c -c $COMMUNITY $HOST $PORT_RX_SPEED_OID | grep ".0.0.$PORT_REAL ="  | sed -e 's,^.*: ,,' | tr -d ' ' | bc`
+	PERFDATA="$PERFDATA tx_speed_bytes=$PORT_TX_SPEED"c";;;; rx_speed_bytes=$PORT_RX_SPEED"c";;;;"
+	#echo  "OK - Port $PORT is up, Partner WWPN is $PORT_PARTNER_WWPN_REAL | $PERFDATA"
+	#exit 0
+	OUTPUT="OK - Port $PORT is up, Partner WWPN is $PORT_PARTNER_WWPN_REAL | $PERFDATA"
+	EXIT_CODE=0
+fi
+
+if [ "$TYP" = 'statistics' ]
+then
+        PORT_TX_SPEED=`snmpwalk -v2c -c $COMMUNITY $HOST $PORT_TX_SPEED_OID | grep ".0.0.$PORT_REAL ="  | sed -e 's,^.*: ,,' | tr -d ' ' | bc`
+        PORT_RX_SPEED=`snmpwalk -v2c -c $COMMUNITY $HOST $PORT_RX_SPEED_OID | grep ".0.0.$PORT_REAL ="  | sed -e 's,^.*: ,,' | tr -d ' ' | bc`
+        PERFDATA="$PERFDATA tx_speed_bytes=$PORT_TX_SPEED"c";;;; rx_speed_bytes=$PORT_RX_SPEED"c";;;;"
+fi
+
+if [ "$TYP" = 'errors' ] || [ "$TYP" = 'statistics' ] && [ $PORT_STATUS = 1 ]
+then
+	if [ $PORT_ERROR -ge $WARN ] && [ $PORT_ERROR -lt $CRIT ]
+	then
+	OUTPUT="WARNING - $PORT_ERROR errors on Port $PORT $PERFDATA"
+	EXIT_CODE=1
+	fi
+
+	if [ $PORT_ERROR -ge $CRIT ]
+	then
+	OUTPUT="CRITICAL - $PORT_ERROR errors on Port $PORT $PERFDATA"
+	EXIT_CODE=2
+	fi
+
+	OUTPUT="OK - Port $PORT is up, Partner WWPN is $PORT_PARTNER_WWPN_REAL, $PORT_ERROR errors on Port $PORT | $PERFDATA"
+	EXIT_CODE=0
+fi
+
+if [ "$PERFDATA_OPTION" != '' ]
+then
+	PERFDATA=""
+fi
+
+echo $OUTPUT
+exit $EXIT_CODE
