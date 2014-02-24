@@ -82,14 +82,14 @@ PORT_TX_SPEED_OID=1.3.6.1.3.94.4.5.1.6.16.0.0.192.221
 PORT_RX_SPEED_OID=1.3.6.1.3.94.4.5.1.7.16.0.0.192.221
 PORT_REAL=$(($PORT+1))
 
-PORT_STATUS=`snmpwalk -v2c -c $COMMUNITY $HOST $PORT_STATUS_OID.$PORT_REAL  | sed -e 's,^.*: ,,' | tr -d ' ' | bc`
+PORT_STATUS=`snmpwalk -v2c -0q -0v -c $COMMUNITY $HOST $PORT_STATUS_OID.$PORT_REAL`
 if [ "$PORT_STATUS" = '' ]
 then
 	echo "Unknown Error"
 	exit 3
 fi
 
-PORT_ADMIN_STATUS=`snmpwalk -v2c -c $COMMUNITY $HOST $PORT_ADMIN_STATUS_OID.$PORT_REAL  | sed -e 's,^.*: ,,' | tr -d ' ' | bc`
+PORT_ADMIN_STATUS=`snmpwalk -v2c -0q -0v -c $COMMUNITY $HOST $PORT_ADMIN_STATUS_OID.$PORT_REAL`
 
 OUTPUT=""
 EXIT_CODE=3
@@ -111,7 +111,7 @@ then
 
 	if [ $PORT_STATUS = 1 ]
 	then
-		PORT_PARTNER_WWPN=`snmpwalk -v2c -c $COMMUNITY $HOST $PORT_PARTNER_WWPN_OID.$PORT_REAL.1  | sed -e 's,^.*: ,,' | tr -d ' '`
+		PORT_PARTNER_WWPN=`snmpwalk -v2c -0q -0v -c $COMMUNITY $HOST $PORT_PARTNER_WWPN_OID.$PORT_REAL.1  | tr -d ' '`
 		if [[ $PORT_PARTNER_WWPN =~ .*SNMP.* ]]
 		then
 			PORT_PARTNER_WWPN_REAL="0"
