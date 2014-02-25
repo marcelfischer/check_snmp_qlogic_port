@@ -112,7 +112,7 @@ then
 	if [ $PORT_STATUS = 1 ]
 	then
 		PORT_PARTNER_WWPN=`snmpwalk -v2c -Oq -Ov -c $COMMUNITY $HOST $PORT_PARTNER_WWPN_OID.$PORT_REAL.1  | tr -d ' '`
-		if [[ $PORT_PARTNER_WWPN =~ .*SNMP.* ]]
+		if [[ $PORT_PARTNER_WWPN =~ .*SNMP.* ]] || [[ $PORT_PARTNER_WWPN == NoSuchInstancecurrentlyexistsatthisOID ]]
 		then
 			PORT_PARTNER_WWPN_REAL="0"
 		else
